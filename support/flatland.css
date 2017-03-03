@@ -1,0 +1,27 @@
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+/*
+html {
+  overflow: hidden;
+  position: relative!important;
+}
+body {
+  font-family: Arial, sans-serif;
+  background: #010101;
+  color:      #eee;
+}
+
+h1, h2 {
+  position: absolute;
+  z-index: 1;
+  margin: 20px;
+}
+h2 {
+  margin-top: 3em;
+}
+*/
