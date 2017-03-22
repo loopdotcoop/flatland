@@ -7,7 +7,7 @@
 !function (ROOT) { 'use strict'
 
 const NAME     = 'Flatland'
-    , VERSION  = '0.0.2'
+    , VERSION  = '0.0.3'
     , HOMEPAGE = 'http://flatland.loop.coop/'
 
 
@@ -19,6 +19,7 @@ const Flatland = ROOT.Flatland = class {
         //// Record configuration.
         const defaults = {
             THREE:     Flatland.stubs.THREE // allows Node.js unit tests
+          , originMarkers: false            // show where the scene’s (0,0,0) is
           , antialias: true                 // passed to THREE.WebGLRenderer
           , wrap:      ROOT.document ?      // HTML element to place <CANVAS> in
                            ROOT.document.body : Flatland.stubs.body
@@ -55,22 +56,25 @@ const Flatland = ROOT.Flatland = class {
           , 1
           , 1000
         );
-        this.camera.position.set( -0.5, 0.7, 6 )
+        this.camera.position.set( 0, 2, 10 )
 
         //// Create the scene and the renderer.
         this.scene = new this.THREE.Scene()
         this.renderer = new this.THREE.WebGLRenderer({ antialias: true })
         this.renderer.setSize(this.width, this.height)
+        this.renderer.shadowMap.enabled = true
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
         this.wrap.appendChild(this.renderer.domElement)
 
         //// Create mouse controls (rotate, pan and zoom).
         this.controls = new this.THREE.OrbitControls(this.camera, this.wrap)
+        // this.controls.target = this.THREE.Vector3(0, 3, 0)
 
         //// Add an ambient light - this always has element id zero.
         this.add({
             class:     Flatland.El.Light.Ambient
           , color:     0xFFFFFF
-          , intensity: 0.5
+          , intensity: 0.3
         })
 
 /* @TODO remove this
@@ -91,6 +95,34 @@ const Flatland = ROOT.Flatland = class {
         }
 */
 
+        //// Show the origin.
+        if (this.originMarkers) {
+        	const origin = new this.THREE.Mesh(
+                new this.THREE.CubeGeometry( 0.1, 0.1, 0.1 )
+              , new this.THREE.MeshBasicMaterial({ color: 0xFFFFFF })
+            )
+        	origin.position.set(0, 0, 0)
+            this.scene.add(origin)
+        	const x1 = new this.THREE.Mesh(
+                new this.THREE.CubeGeometry( 0.1, 0.1, 0.1 )
+              , new this.THREE.MeshBasicMaterial({ color: 0xFF0000 })
+            )
+        	x1.position.set(1, 0, 0)
+            this.scene.add(x1)
+        	const y1 = new this.THREE.Mesh(
+                new this.THREE.CubeGeometry( 0.1, 0.1, 0.1 )
+              , new this.THREE.MeshBasicMaterial({ color: 0x00FF00 })
+            )
+        	y1.position.set(0, 1, 0)
+            this.scene.add(y1)
+        	const z1 = new this.THREE.Mesh(
+                new this.THREE.CubeGeometry( 0.1, 0.1, 0.1 )
+              , new this.THREE.MeshBasicMaterial({ color: 0x0000FF })
+            )
+        	z1.position.set(0, 0, 1)
+            this.scene.add(z1)
+        }
+
     }
 
 
@@ -103,9 +135,9 @@ const Flatland = ROOT.Flatland = class {
     //// Creates a new element.
     add (config={}) {
         const
-            id = config.id = this.id++       // record the new ID in `config`
-          , z  = config.z  = this.els.length // record the z-index in `config`
-          , el = this.ids[id] = this.els[z] = new config.class(config, this)
+            id = config.id = this.id++     // record the new ID in `config`
+          , len = this.els.length          // record the z-index in `config`
+          , el = this.ids[id] = this.els[len] = new config.class(config, this)
         if (el.ref) this.scene.add(el.ref) // if its THREE.Object3D is ready
         return id
     }
@@ -126,15 +158,26 @@ const Flatland = ROOT.Flatland = class {
 
 
     //// Returns a material from the materials cache, or creates it if missing.
-    getMaterial (path) {
+    getMaterial (path, repeat, luminous) {
         if (this.materials[path]) return this.materials[path]
         let texture = this.textureLoader.load(path)
+
+        //// Apply attributes to the texture. @TODO different attribs need different caches
         texture.wrapS = texture.wrapT = this.THREE.MirroredRepeatWrapping
-        return this.materials[path] = new this.THREE.MeshBasicMaterial({
-            color:     0x808080
-          , map:       texture
-          , wireframe: false
-        });
+        texture.repeat.set(repeat, repeat)
+
+        if (luminous)
+            return this.materials[path] = new this.THREE.MeshBasicMaterial({
+                color:     0xFFFFFF
+              , map:       texture
+              , wireframe: false
+            })
+        else
+            return this.materials[path] = new this.THREE.MeshLambertMaterial({
+                color:     0x999999
+              , map:       texture
+              , wireframe: false
+            })
     }
 
 
@@ -223,7 +266,7 @@ const Flatland = ROOT.Flatland = class {
                 callback(geometry)
             }
           , function () { console.log("Loading SVG...")     ; callback(false) }
-          , function () { console.warn("Error loading SVG!"); callback(false) }
+          , function (e) {console.warn("Error loading SVG!",e); callback(false)}
         )
 
     }
@@ -382,23 +425,37 @@ ROOT.Flatland.El.Cutout = class extends ROOT.Flatland.El {
 
         //// Record configuration.
         const defaults = {
-            bitmap: // eg 'assets/test-1024.jpg'
+            bitmap:  // eg 'assets/test-1024.jpg'
                 ROOT.Flatland.HOMEPAGE
               + '/support/assets/test-1024.jpg'
-          , svg:    // eg 'assets/test.svg'
+          , svg:     // eg 'assets/test.svg'
                 ROOT.Flatland.HOMEPAGE
               + '/support/assets/test.svg'
+          , x:        0
+          , y:        0
+          , z:        0
+          , xRotate:  0 // in degrees
+          , yRotate:  0 // in degrees
+          , zRotate:  0 // in degrees
+          , xyScale:  null
+          , xScale:   1
+          , yScale:   1
+          , zScale:   1
+          , repeat:   1
+          , shadow:   true
+          , visible:  true // visible by default
+          , luminous: false
         }
         Object.assign(this, defaults, config, { app })
 
         ////
-        this.material = app.getMaterial(this.bitmap)
+        this.material = app.getMaterial(this.bitmap, this.repeat, this.luminous)
 
         ////
         app.getGeometry(this.svg, geometry => {
             if (! geometry) return // signifies failure
 
-            //// Record the newly created mesh...
+            //// Record the newly created mesh.
             this.ref = new app.THREE.Mesh(
                 geometry
               , new app.THREE.MultiMaterial([
@@ -407,7 +464,26 @@ ROOT.Flatland.El.Cutout = class extends ROOT.Flatland.El {
                 ])
             );
 
-            //// ...and add it to the scene.
+            //// Convert multi-attributes to singles.
+            if (null != this.xyScale) this.xScale = this.yScale = this.xyScale
+
+            //// Apply attributes to the mesh.
+            this.ref.position.set(this.x, this.y, this.z)
+            this.ref.scale.set(this.xScale, this.yScale, 1)
+            this.ref.visible = this.visible
+            this.ref.rotation.set(
+                this.xRotate * Math.PI / 180
+              , this.yRotate * Math.PI / 180
+              , this.zRotate * Math.PI / 180
+            )
+
+            //// Luminous Cutouts do not recieve or cast shadows.
+            if (! this.luminous) {
+                this.ref.receiveShadow = this.shadow
+                this.ref.castShadow = this.shadow
+            }
+
+            //// Add the mesh to the scene.
             app.scene.add(this.ref)
 
         })
@@ -474,6 +550,80 @@ ROOT.Flatland.El.Light.Ambient = class extends ROOT.Flatland.El.Light {
         )
     }
 
+}
+
+
+}( 'object' == typeof global ? global : this ) // `window` in a browser
+
+
+
+
+//\\//\\ src/main/El.Light.Spot.6.js
+
+
+
+//// Flatland //// 0.0.* //// March 2017 //// http://flatland.loop.coop/ ///////
+
+!function (ROOT) { 'use strict'
+
+
+ROOT.Flatland.El.Light.Spot = class extends ROOT.Flatland.El.Light {
+
+    constructor (config, app) {
+        super(config, app)
+
+        //// Record configuration.
+        const defaults = {
+            x:          0 //@TODO inherit from El
+          , y:          0
+          , z:          0
+          , color:      0xFFFFFF
+          , intensity:  0.5
+          , distance:   40
+          , angle:      30
+          , penumbra:   0.2
+          , decay:      0
+          , lookAt:     { x:0, y:0, z:0 }
+          , shadow: {
+                enabled: true
+              , near:    0.5
+              , mapSize: 2048
+            }
+        }
+        Object.assign(this, defaults, config, { app })
+
+        //// Instantiate the THREE object.
+        this.ref = new app.THREE.SpotLight(
+            this.color
+          , this.intensity
+          , this.distance
+          , this.angle * Math.PI / 180
+          , this.penumbra
+          , this.decay
+        )
+
+        //// Apply attributes to the mesh.
+        this.ref.position.set(this.x, this.y, this.z)
+        this.ref.castShadow = this.shadow.enabled
+        this.ref.shadow.camera.near    = this.shadow.near
+        this.ref.shadow.mapSize.width  = this.shadow.mapSize
+        this.ref.shadow.mapSize.height = this.shadow.mapSize
+        this.ref.lookAt( new app.THREE.Vector3(
+            this.lookAt.x
+          , this.lookAt.y
+          , this.lookAt.z
+        ) )
+
+        if (app.originMarkers) {
+        	const marker = new app.THREE.Mesh(
+                new app.THREE.CubeGeometry( 0.1, 0.1, 0.1 )
+              , new app.THREE.MeshBasicMaterial({ color: this.color })
+            )
+        	marker.position.set(0, 0, 0)
+            this.ref.add(marker)
+        }
+
+    }
 }
 
 

@@ -43,6 +43,14 @@ jQuery(function($) {
     is('function' == typeof Flatland.El.Light.Ambient, '`Flatland.El.Light.Ambient` is a function');
   });
 });
+if ('function' != typeof jQuery)
+  throw Error('jQuery not found');
+jQuery(function($) {
+  'use strict';
+  test('The El.Light.Spot class (universal)', function() {
+    is('function' == typeof Flatland.El.Light.Spot, '`Flatland.El.Light.Spot` is a function');
+  });
+});
 //# sourceURL=<compile-source>
 
 

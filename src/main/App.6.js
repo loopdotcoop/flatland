@@ -3,7 +3,7 @@
 !function (ROOT) { 'use strict'
 
 const NAME     = 'Flatland'
-    , VERSION  = '0.0.2'
+    , VERSION  = '0.0.3'
     , HOMEPAGE = 'http://flatland.loop.coop/'
 
 
@@ -15,6 +15,7 @@ const Flatland = ROOT.Flatland = class {
         //// Record configuration.
         const defaults = {
             THREE:     Flatland.stubs.THREE // allows Node.js unit tests
+          , originMarkers: false            // show where the scene’s (0,0,0) is
           , antialias: true                 // passed to THREE.WebGLRenderer
           , wrap:      ROOT.document ?      // HTML element to place <CANVAS> in
                            ROOT.document.body : Flatland.stubs.body
@@ -51,22 +52,25 @@ const Flatland = ROOT.Flatland = class {
           , 1
           , 1000
         );
-        this.camera.position.set( -0.5, 0.7, 6 )
+        this.camera.position.set( 0, 2, 10 )
 
         //// Create the scene and the renderer.
         this.scene = new this.THREE.Scene()
         this.renderer = new this.THREE.WebGLRenderer({ antialias: true })
         this.renderer.setSize(this.width, this.height)
+        this.renderer.shadowMap.enabled = true
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
         this.wrap.appendChild(this.renderer.domElement)
 
         //// Create mouse controls (rotate, pan and zoom).
         this.controls = new this.THREE.OrbitControls(this.camera, this.wrap)
+        // this.controls.target = this.THREE.Vector3(0, 3, 0)
 
         //// Add an ambient light - this always has element id zero.
         this.add({
             class:     Flatland.El.Light.Ambient
           , color:     0xFFFFFF
-          , intensity: 0.5
+          , intensity: 0.3
         })
 
 /* @TODO remove this
@@ -87,6 +91,34 @@ const Flatland = ROOT.Flatland = class {
         }
 */
 
+        //// Show the origin.
+        if (this.originMarkers) {
+        	const origin = new this.THREE.Mesh(
+                new this.THREE.CubeGeometry( 0.1, 0.1, 0.1 )
+              , new this.THREE.MeshBasicMaterial({ color: 0xFFFFFF })
+            )
+        	origin.position.set(0, 0, 0)
+            this.scene.add(origin)
+        	const x1 = new this.THREE.Mesh(
+                new this.THREE.CubeGeometry( 0.1, 0.1, 0.1 )
+              , new this.THREE.MeshBasicMaterial({ color: 0xFF0000 })
+            )
+        	x1.position.set(1, 0, 0)
+            this.scene.add(x1)
+        	const y1 = new this.THREE.Mesh(
+                new this.THREE.CubeGeometry( 0.1, 0.1, 0.1 )
+              , new this.THREE.MeshBasicMaterial({ color: 0x00FF00 })
+            )
+        	y1.position.set(0, 1, 0)
+            this.scene.add(y1)
+        	const z1 = new this.THREE.Mesh(
+                new this.THREE.CubeGeometry( 0.1, 0.1, 0.1 )
+              , new this.THREE.MeshBasicMaterial({ color: 0x0000FF })
+            )
+        	z1.position.set(0, 0, 1)
+            this.scene.add(z1)
+        }
+
     }
 
 
@@ -99,9 +131,9 @@ const Flatland = ROOT.Flatland = class {
     //// Creates a new element.
     add (config={}) {
         const
-            id = config.id = this.id++       // record the new ID in `config`
-          , z  = config.z  = this.els.length // record the z-index in `config`
-          , el = this.ids[id] = this.els[z] = new config.class(config, this)
+            id = config.id = this.id++     // record the new ID in `config`
+          , len = this.els.length          // record the z-index in `config`
+          , el = this.ids[id] = this.els[len] = new config.class(config, this)
         if (el.ref) this.scene.add(el.ref) // if its THREE.Object3D is ready
         return id
     }
@@ -122,15 +154,26 @@ const Flatland = ROOT.Flatland = class {
 
 
     //// Returns a material from the materials cache, or creates it if missing.
-    getMaterial (path) {
+    getMaterial (path, repeat, luminous) {
         if (this.materials[path]) return this.materials[path]
         let texture = this.textureLoader.load(path)
+
+        //// Apply attributes to the texture. @TODO different attribs need different caches
         texture.wrapS = texture.wrapT = this.THREE.MirroredRepeatWrapping
-        return this.materials[path] = new this.THREE.MeshBasicMaterial({
-            color:     0x808080
-          , map:       texture
-          , wireframe: false
-        });
+        texture.repeat.set(repeat, repeat)
+
+        if (luminous)
+            return this.materials[path] = new this.THREE.MeshBasicMaterial({
+                color:     0xFFFFFF
+              , map:       texture
+              , wireframe: false
+            })
+        else
+            return this.materials[path] = new this.THREE.MeshLambertMaterial({
+                color:     0x999999
+              , map:       texture
+              , wireframe: false
+            })
     }
 
 
@@ -219,7 +262,7 @@ const Flatland = ROOT.Flatland = class {
                 callback(geometry)
             }
           , function () { console.log("Loading SVG...")     ; callback(false) }
-          , function () { console.warn("Error loading SVG!"); callback(false) }
+          , function (e) {console.warn("Error loading SVG!",e); callback(false)}
         )
 
     }

@@ -21,7 +21,7 @@ var d = ROOT.document || {
 //// This dynamic section is kept up to date by ‘ootility/make.js’ /////////////
 
 var projectLC = 'flatland'
-var classes = 'App,El,El.Cutout,El.Light,El.Light.Ambient'
+var classes = 'App,El,El.Cutout,El.Light,El.Light.Ambient,El.Light.Spot'
 
 //// END DYNAMIC SECTION ///////////////////////////////////////////////////////
 

@@ -2,12 +2,13 @@
 !function(ROOT) {
   'use strict';
   var NAME = 'Flatland',
-      VERSION = '0.0.2',
+      VERSION = '0.0.3',
       HOMEPAGE = 'http://flatland.loop.coop/';
   var Flatland = ROOT.Flatland = ($traceurRuntime.createClass)(function() {
     var config = arguments[0] !== (void 0) ? arguments[0] : {};
     var defaults = {
       THREE: Flatland.stubs.THREE,
+      originMarkers: false,
       antialias: true,
       wrap: ROOT.document ? ROOT.document.body : Flatland.stubs.body,
       WINDOW: ROOT.innerWidth ? ROOT : Flatland.stubs.window
@@ -24,17 +25,33 @@
     this.textureLoader = new this.THREE.TextureLoader();
     this.svgLoader = new this.THREE.SVGLoader();
     this.camera = new this.THREE.PerspectiveCamera(25, this.width / this.height, 1, 1000);
-    this.camera.position.set(-0.5, 0.7, 6);
+    this.camera.position.set(0, 2, 10);
     this.scene = new this.THREE.Scene();
     this.renderer = new this.THREE.WebGLRenderer({antialias: true});
     this.renderer.setSize(this.width, this.height);
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.wrap.appendChild(this.renderer.domElement);
     this.controls = new this.THREE.OrbitControls(this.camera, this.wrap);
     this.add({
       class: Flatland.El.Light.Ambient,
       color: 0xFFFFFF,
-      intensity: 0.5
+      intensity: 0.3
     });
+    if (this.originMarkers) {
+      var origin = new this.THREE.Mesh(new this.THREE.CubeGeometry(0.1, 0.1, 0.1), new this.THREE.MeshBasicMaterial({color: 0xFFFFFF}));
+      origin.position.set(0, 0, 0);
+      this.scene.add(origin);
+      var x1 = new this.THREE.Mesh(new this.THREE.CubeGeometry(0.1, 0.1, 0.1), new this.THREE.MeshBasicMaterial({color: 0xFF0000}));
+      x1.position.set(1, 0, 0);
+      this.scene.add(x1);
+      var y1 = new this.THREE.Mesh(new this.THREE.CubeGeometry(0.1, 0.1, 0.1), new this.THREE.MeshBasicMaterial({color: 0x00FF00}));
+      y1.position.set(0, 1, 0);
+      this.scene.add(y1);
+      var z1 = new this.THREE.Mesh(new this.THREE.CubeGeometry(0.1, 0.1, 0.1), new this.THREE.MeshBasicMaterial({color: 0x0000FF}));
+      z1.position.set(0, 0, 1);
+      this.scene.add(z1);
+    }
   }, {
     render: function() {
       var config = arguments[0] !== (void 0) ? arguments[0] : {};
@@ -43,8 +60,8 @@
     add: function() {
       var config = arguments[0] !== (void 0) ? arguments[0] : {};
       var id = config.id = this.id++,
-          z = config.z = this.els.length,
-          el = this.ids[id] = this.els[z] = new config.class(config, this);
+          len = this.els.length,
+          el = this.ids[id] = this.els[len] = new config.class(config, this);
       if (el.ref)
         this.scene.add(el.ref);
       return id;
@@ -57,23 +74,31 @@
       el.edit(config);
     },
     trigger: function(config) {
-      var $__17 = this,
-          ids = $__17.ids,
-          id = $__17.id;
+      var $__12 = this,
+          ids = $__12.ids,
+          id = $__12.id;
     },
-    getMaterial: function(path) {
+    getMaterial: function(path, repeat, luminous) {
       if (this.materials[path])
         return this.materials[path];
       var texture = this.textureLoader.load(path);
       texture.wrapS = texture.wrapT = this.THREE.MirroredRepeatWrapping;
-      return this.materials[path] = new this.THREE.MeshBasicMaterial({
-        color: 0x808080,
-        map: texture,
-        wireframe: false
-      });
+      texture.repeat.set(repeat, repeat);
+      if (luminous)
+        return this.materials[path] = new this.THREE.MeshBasicMaterial({
+          color: 0xFFFFFF,
+          map: texture,
+          wireframe: false
+        });
+      else
+        return this.materials[path] = new this.THREE.MeshLambertMaterial({
+          color: 0x999999,
+          map: texture,
+          wireframe: false
+        });
     },
     getGeometry: function(path, callback) {
-      var $__16 = this;
+      var $__11 = this;
       if (this.geometries[path])
         return this.geometries[path];
       this.svgLoader.load(path, function(svgElement) {
@@ -84,8 +109,8 @@
             points = [];
         if (width !== height)
           return console.warn(("width " + width + " !== height " + height));
-        for (var i$__18 = 0,
-            node = void 0; node = svgElement.childNodes[i$__18++]; ) {
+        for (var i$__13 = 0,
+            node = void 0; node = svgElement.childNodes[i$__13++]; ) {
           if (!node.tagName)
             continue;
           if ('polygon' !== node.tagName.toLowerCase())
@@ -96,10 +121,10 @@
               pair = void 0,
               p = void 0; pair = pairs[j++]; ) {
             p = pair.split(',');
-            points[points.length - 1].push(new $__16.THREE.Vector2(p[0] / width - 0.5, -p[1] / width + 1));
+            points[points.length - 1].push(new $__11.THREE.Vector2(p[0] / width - 0.5, -p[1] / width + 1));
           }
         }
-        var shape = new $__16.THREE.Shape(points.shift());
+        var shape = new $__11.THREE.Shape(points.shift());
         for (var i = 0,
             hole = void 0; hole = points[i++]; ) {
           if (0 > polygonArea(hole)) {
@@ -107,9 +132,9 @@
             console.log('Fixed a clockwise hole!');
           }
           hole.unshift(hole[0]);
-          shape.holes.push(new $__16.THREE.Path(hole));
+          shape.holes.push(new $__11.THREE.Path(hole));
         }
-        var geometry = new $__16.THREE.ExtrudeGeometry(shape, {
+        var geometry = new $__11.THREE.ExtrudeGeometry(shape, {
           amount: 0.02,
           steps: 1,
           material: 0,
@@ -125,13 +150,13 @@
         }, {
           x: 0.5,
           y: 1
-        }, $__16.THREE);
+        }, $__11.THREE);
         callback(geometry);
       }, function() {
         console.log("Loading SVG...");
         callback(false);
-      }, function() {
-        console.warn("Error loading SVG!");
+      }, function(e) {
+        console.warn("Error loading SVG!", e);
         callback(false);
       });
     }
@@ -209,19 +234,43 @@
   'use strict';
   ROOT.Flatland.El.Cutout = function($__super) {
     function $__0(config, app) {
-      var $__16;
+      var $__11;
       $traceurRuntime.superConstructor($__0).call(this, config, app);
       var defaults = {
         bitmap: ROOT.Flatland.HOMEPAGE + '/support/assets/test-1024.jpg',
-        svg: ROOT.Flatland.HOMEPAGE + '/support/assets/test.svg'
+        svg: ROOT.Flatland.HOMEPAGE + '/support/assets/test.svg',
+        x: 0,
+        y: 0,
+        z: 0,
+        xRotate: 0,
+        yRotate: 0,
+        zRotate: 0,
+        xyScale: null,
+        xScale: 1,
+        yScale: 1,
+        zScale: 1,
+        repeat: 1,
+        shadow: true,
+        visible: true,
+        luminous: false
       };
       Object.assign(this, defaults, config, {app: app});
-      this.material = app.getMaterial(this.bitmap);
-      app.getGeometry(this.svg, ($__16 = this, function(geometry) {
+      this.material = app.getMaterial(this.bitmap, this.repeat, this.luminous);
+      app.getGeometry(this.svg, ($__11 = this, function(geometry) {
         if (!geometry)
           return;
-        $__16.ref = new app.THREE.Mesh(geometry, new app.THREE.MultiMaterial([$__16.material, $__16.material]));
-        app.scene.add($__16.ref);
+        $__11.ref = new app.THREE.Mesh(geometry, new app.THREE.MultiMaterial([$__11.material, $__11.material]));
+        if (null != $__11.xyScale)
+          $__11.xScale = $__11.yScale = $__11.xyScale;
+        $__11.ref.position.set($__11.x, $__11.y, $__11.z);
+        $__11.ref.scale.set($__11.xScale, $__11.yScale, 1);
+        $__11.ref.visible = $__11.visible;
+        $__11.ref.rotation.set($__11.xRotate * Math.PI / 180, $__11.yRotate * Math.PI / 180, $__11.zRotate * Math.PI / 180);
+        if (!$__11.luminous) {
+          $__11.ref.receiveShadow = $__11.shadow;
+          $__11.ref.castShadow = $__11.shadow;
+        }
+        app.scene.add($__11.ref);
       }));
     }
     return ($traceurRuntime.createClass)($__0, {}, {}, $__super);
@@ -247,6 +296,49 @@
       };
       Object.assign(this, defaults, config, {app: app});
       this.ref = new app.THREE.AmbientLight(this.color, this.intensity);
+    }
+    return ($traceurRuntime.createClass)($__0, {}, {}, $__super);
+  }(ROOT.Flatland.El.Light);
+}('object' == (typeof global === 'undefined' ? 'undefined' : $traceurRuntime.typeof(global)) ? global : this);
+!function(ROOT) {
+  'use strict';
+  ROOT.Flatland.El.Light.Spot = function($__super) {
+    function $__0(config, app) {
+      $traceurRuntime.superConstructor($__0).call(this, config, app);
+      var defaults = {
+        x: 0,
+        y: 0,
+        z: 0,
+        color: 0xFFFFFF,
+        intensity: 0.5,
+        distance: 40,
+        angle: 30,
+        penumbra: 0.2,
+        decay: 0,
+        lookAt: {
+          x: 0,
+          y: 0,
+          z: 0
+        },
+        shadow: {
+          enabled: true,
+          near: 0.5,
+          mapSize: 2048
+        }
+      };
+      Object.assign(this, defaults, config, {app: app});
+      this.ref = new app.THREE.SpotLight(this.color, this.intensity, this.distance, this.angle * Math.PI / 180, this.penumbra, this.decay);
+      this.ref.position.set(this.x, this.y, this.z);
+      this.ref.castShadow = this.shadow.enabled;
+      this.ref.shadow.camera.near = this.shadow.near;
+      this.ref.shadow.mapSize.width = this.shadow.mapSize;
+      this.ref.shadow.mapSize.height = this.shadow.mapSize;
+      this.ref.lookAt(new app.THREE.Vector3(this.lookAt.x, this.lookAt.y, this.lookAt.z));
+      if (app.originMarkers) {
+        var marker = new app.THREE.Mesh(new app.THREE.CubeGeometry(0.1, 0.1, 0.1), new app.THREE.MeshBasicMaterial({color: this.color}));
+        marker.position.set(0, 0, 0);
+        this.ref.add(marker);
+      }
     }
     return ($traceurRuntime.createClass)($__0, {}, {}, $__super);
   }(ROOT.Flatland.El.Light);
