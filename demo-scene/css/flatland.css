@@ -1,0 +1,19 @@
+html {
+  overflow: hidden;
+  position: relative!important;
+}
+body {
+  font-family: Arial, sans-serif;
+  /*overflow: scroll!important;*//* hide address bar in mobile */
+  background: #010101;
+  color:      #eee;
+}
+
+h1, h2 {
+  position: absolute;
+  z-index: 1;
+  margin: 20px;
+}
+h2 {
+  margin-top: 3em;
+}
