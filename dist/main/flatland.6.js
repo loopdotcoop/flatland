@@ -7,7 +7,7 @@
 !function (ROOT) { 'use strict'
 
 const NAME     = 'Flatland'
-    , VERSION  = '0.0.3'
+    , VERSION  = '0.0.4'
     , HOMEPAGE = 'http://flatland.loop.coop/'
 
 
@@ -184,91 +184,172 @@ const Flatland = ROOT.Flatland = class {
     //// Returns a geometry from the geometries cache, or creates it if missing.
     //// To create it, it loads the SVG shape, extrudes it, and uv-maps it.
     getGeometry (path, callback) {
-        if (this.geometries[path]) return this.geometries[path]
 
-        this.svgLoader.load(
-            path // eg 'assets/svg/tree.svg'
-          , svgElement => {
-                if ('parsererror' === svgElement.tagName) //@TODO test cross-browser
-                    return console.warn(`Cannot parse ${path}`)
+        if ('object' === typeof path) { //@TODO dry
+            const
+                width   = path.width
+              , height  = path.height
+              , nodes   = path.nodes
+              , cacheId = path.cacheId
+              , points  = []
 
-                const
-                    width  = parseInt( svgElement.getAttribute('width') )
-                  , height = parseInt( svgElement.getAttribute('height') )
-                  , points = []
-                if (width !== height)
-                    return console.warn(`width ${width} !== height ${height}`)
-                for (let i=0, node; node=svgElement.childNodes[i++];) {
+            if (this.geometries[cacheId]) return callback(this.geometries[cacheId])
 
-                    if (! node.tagName) continue // probably a text-node
-                    if ( 'polygon' !== node.tagName.toLowerCase() )
-                        return console.warn(`${path} unexpected node.tagName`)
+            for (let i=0, node; node=nodes[i++];) {
 
-                    //// Polygon index 0 is the main shape. The rest are holes.
-                    points.push([])
+                //// Polygon index 0 is the main shape. The rest are holes.
+                points.push([])
 
-                    //// Read the path-data from the SVG, and create a shape.
-                    const pairs =
-                        node
-                       .getAttribute('points')
-                       .replace(/\s+/g, ' ') // newlines, multiple spaces
-                       .replace(/\s+$/, '') // space at end
-                       .split(' ')
+                //// Read the path-data from the SVG, and create a shape.
+                const pairs =
+                    node
+                   .replace(/\s+/g, ' ') // newlines, multiple spaces
+                   .replace(/\s+$/, '') // space at end
+                   .split(' ')
 
-                    //// Store each point as a two-value vector.
-                    for (let j=0, pair, p; pair=pairs[j++];) {
-                        p = pair.split(',')
-                        points[points.length-1].push(
-                            new this.THREE.Vector2(
-                                  p[0] / width - 0.5
-                              , - p[1] / width + 1 // reverse the Y-direction
-                            )
+                //// Store each point as a two-value vector.
+                for (let j=0, pair, p; pair=pairs[j++];) {
+                    p = pair.split(',')
+                    points[points.length-1].push(
+                        new this.THREE.Vector2(
+                              p[0] / width - 0.5
+                          , - p[1] / width + 1 // reverse the Y-direction
                         )
-                    }
-
+                    )
                 }
-
-                //// Create the shape.
-                const shape = new this.THREE.Shape( points.shift() )
-                for (var i=0, hole; hole=points[i++];) {
-                    if (0 > polygonArea(hole) ) {
-                        hole.reverse()
-                        console.log('Fixed a clockwise hole!')
-                    }
-                    hole.unshift( hole[0] ) // use first vertex as 'offset'
-                    shape.holes.push( new this.THREE.Path(hole) )
-                }
-
-                //// Extrude the shape.
-                var geometry = new this.THREE.ExtrudeGeometry(
-                    shape
-                  , {
-                        amount          : 0.02
-                      , steps           : 1
-                      , material        : 0
-                      , extrudeMaterial : 1
-                      , bevelEnabled    : false
-                      , bevelThickness  : 0.1
-                      , bevelSize       : 0.2
-                      , bevelSegments   : 1
-                    }
-                )
-
-                //// Remap the UVs.
-                planarProjection(
-                    geometry
-                  , { x:-0.5, y:0 } // move the origin...
-                  , { x: 0.5, y:1 } // ...to the bottom-middle
-                  , this.THREE
-                )
-
-                //// Pass the geometry back to the original caller.
-                callback(geometry)
             }
-          , function () { console.log("Loading SVG...")     ; callback(false) }
-          , function (e) {console.warn("Error loading SVG!",e); callback(false)}
-        )
 
+
+            //// Create the shape.
+            const shape = new this.THREE.Shape( points.shift() )
+            for (var i=0, hole; hole=points[i++];) {
+                if (0 > polygonArea(hole) ) {
+                    hole.reverse()
+                    console.log('Fixed a clockwise hole!')
+                }
+                hole.unshift( hole[0] ) // use first vertex as 'offset'
+                shape.holes.push( new this.THREE.Path(hole) )
+            }
+
+            //// Extrude the shape.
+            var geometry = new this.THREE.ExtrudeGeometry(
+                shape
+              , {
+                    amount          : 0.02
+                  , steps           : 1
+                  , material        : 0
+                  , extrudeMaterial : 1
+                  , bevelEnabled    : false
+                  , bevelThickness  : 0.1
+                  , bevelSize       : 0.2
+                  , bevelSegments   : 1
+                }
+            )
+
+            //// Remap the UVs.
+            planarProjection(
+                geometry
+              , { x:-0.5, y:0 } // move the origin...
+              , { x: 0.5, y:1 } // ...to the bottom-middle
+              , this.THREE
+            )
+
+            //// Cache, using the cacheId as a key.
+            this.geometries[cacheId] = geometry
+
+            //// Pass the geometry back to the original caller.
+            callback(geometry)
+
+        } else {
+
+            if (this.geometries[path]) return callback(this.geometries[path])
+
+            this.svgLoader.load(
+                path // eg 'assets/svg/tree.svg'
+              , svgElement => {
+                    if ('parsererror' === svgElement.tagName) //@TODO test cross-browser
+                        return console.warn(`Cannot parse ${path}`)
+
+                    const
+                        width  = parseInt( svgElement.getAttribute('width') )
+                      , height = parseInt( svgElement.getAttribute('height') )
+                      , points = []
+                    if (width !== height)
+                        return console.warn(`width ${width} !== height ${height}`)
+                    for (let i=0, node; node=svgElement.childNodes[i++];) {
+
+                        if (! node.tagName) continue // probably a text-node
+                        if ( 'polygon' !== node.tagName.toLowerCase() )
+                            return console.warn(`${path} unexpected node.tagName`)
+
+                        //// Polygon index 0 is the main shape. The rest are holes.
+                        points.push([])
+
+                        //// Read the path-data from the SVG, and create a shape.
+                        const pairs =
+                            node
+                           .getAttribute('points')
+                           .replace(/\s+/g, ' ') // newlines, multiple spaces
+                           .replace(/\s+$/, '') // space at end
+                           .split(' ')
+
+                        //// Store each point as a two-value vector.
+                        for (let j=0, pair, p; pair=pairs[j++];) {
+                            p = pair.split(',')
+                            points[points.length-1].push(
+                                new this.THREE.Vector2(
+                                      p[0] / width - 0.5
+                                  , - p[1] / width + 1 // reverse the Y-direction
+                                )
+                            )
+                        }
+
+                    }
+
+                    //// Create the shape.
+                    const shape = new this.THREE.Shape( points.shift() )
+                    for (var i=0, hole; hole=points[i++];) {
+                        if (0 > polygonArea(hole) ) {
+                            hole.reverse()
+                            console.log('Fixed a clockwise hole!')
+                        }
+                        hole.unshift( hole[0] ) // use first vertex as 'offset'
+                        shape.holes.push( new this.THREE.Path(hole) )
+                    }
+
+                    //// Extrude the shape.
+                    var geometry = new this.THREE.ExtrudeGeometry(
+                        shape
+                      , {
+                            amount          : 0.02
+                          , steps           : 1
+                          , material        : 0
+                          , extrudeMaterial : 1
+                          , bevelEnabled    : false
+                          , bevelThickness  : 0.1
+                          , bevelSize       : 0.2
+                          , bevelSegments   : 1
+                        }
+                    )
+
+                    //// Remap the UVs.
+                    planarProjection(
+                        geometry
+                      , { x:-0.5, y:0 } // move the origin...
+                      , { x: 0.5, y:1 } // ...to the bottom-middle
+                      , this.THREE
+                    )
+
+                    //// Cache, using the path name as a key.
+                    this.geometries[path] = geometry
+
+                    //// Pass the geometry back to the original caller.
+                    callback(geometry)
+                }
+              , function () { console.log("Loading SVG...")     ; callback(false) }
+              , function (e) {console.warn("Error loading SVG!",e); callback(false)}
+            )
+        }
     }
 
 }
@@ -442,7 +523,7 @@ ROOT.Flatland.El.Cutout = class extends ROOT.Flatland.El {
           , yScale:   1
           , zScale:   1
           , repeat:   1
-          , shadow:   true
+          , shadow:   false//true
           , visible:  true // visible by default
           , luminous: false
         }

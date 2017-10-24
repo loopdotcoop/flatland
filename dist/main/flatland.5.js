@@ -2,7 +2,7 @@
 !function(ROOT) {
   'use strict';
   var NAME = 'Flatland',
-      VERSION = '0.0.3',
+      VERSION = '0.0.4',
       HOMEPAGE = 'http://flatland.loop.coop/';
   var Flatland = ROOT.Flatland = ($traceurRuntime.createClass)(function() {
     var config = arguments[0] !== (void 0) ? arguments[0] : {};
@@ -74,9 +74,9 @@
       el.edit(config);
     },
     trigger: function(config) {
-      var $__12 = this,
-          ids = $__12.ids,
-          id = $__12.id;
+      var $__9 = this,
+          ids = $__9.ids,
+          id = $__9.id;
     },
     getMaterial: function(path, repeat, luminous) {
       if (this.materials[path])
@@ -98,33 +98,27 @@
         });
     },
     getGeometry: function(path, callback) {
-      var $__11 = this;
-      if (this.geometries[path])
-        return this.geometries[path];
-      this.svgLoader.load(path, function(svgElement) {
-        if ('parsererror' === svgElement.tagName)
-          return console.warn(("Cannot parse " + path));
-        var width = parseInt(svgElement.getAttribute('width')),
-            height = parseInt(svgElement.getAttribute('height')),
+      var $__8 = this;
+      if ('object' === (typeof path === 'undefined' ? 'undefined' : $traceurRuntime.typeof(path))) {
+        var width = path.width,
+            height = path.height,
+            nodes = path.nodes,
+            cacheId = path.cacheId,
             points = [];
-        if (width !== height)
-          return console.warn(("width " + width + " !== height " + height));
-        for (var i$__13 = 0,
-            node = void 0; node = svgElement.childNodes[i$__13++]; ) {
-          if (!node.tagName)
-            continue;
-          if ('polygon' !== node.tagName.toLowerCase())
-            return console.warn((path + " unexpected node.tagName"));
+        if (this.geometries[cacheId])
+          return callback(this.geometries[cacheId]);
+        for (var i$__10 = 0,
+            node = void 0; node = nodes[i$__10++]; ) {
           points.push([]);
-          var pairs = node.getAttribute('points').replace(/\s+/g, ' ').replace(/\s+$/, '').split(' ');
+          var pairs = node.replace(/\s+/g, ' ').replace(/\s+$/, '').split(' ');
           for (var j = 0,
               pair = void 0,
               p = void 0; pair = pairs[j++]; ) {
             p = pair.split(',');
-            points[points.length - 1].push(new $__11.THREE.Vector2(p[0] / width - 0.5, -p[1] / width + 1));
+            points[points.length - 1].push(new this.THREE.Vector2(p[0] / width - 0.5, -p[1] / width + 1));
           }
         }
-        var shape = new $__11.THREE.Shape(points.shift());
+        var shape = new this.THREE.Shape(points.shift());
         for (var i = 0,
             hole = void 0; hole = points[i++]; ) {
           if (0 > polygonArea(hole)) {
@@ -132,9 +126,9 @@
             console.log('Fixed a clockwise hole!');
           }
           hole.unshift(hole[0]);
-          shape.holes.push(new $__11.THREE.Path(hole));
+          shape.holes.push(new this.THREE.Path(hole));
         }
-        var geometry = new $__11.THREE.ExtrudeGeometry(shape, {
+        var geometry = new this.THREE.ExtrudeGeometry(shape, {
           amount: 0.02,
           steps: 1,
           material: 0,
@@ -150,15 +144,72 @@
         }, {
           x: 0.5,
           y: 1
-        }, $__11.THREE);
+        }, this.THREE);
+        this.geometries[cacheId] = geometry;
         callback(geometry);
-      }, function() {
-        console.log("Loading SVG...");
-        callback(false);
-      }, function(e) {
-        console.warn("Error loading SVG!", e);
-        callback(false);
-      });
+      } else {
+        if (this.geometries[path])
+          return callback(this.geometries[path]);
+        this.svgLoader.load(path, function(svgElement) {
+          if ('parsererror' === svgElement.tagName)
+            return console.warn(("Cannot parse " + path));
+          var width = parseInt(svgElement.getAttribute('width')),
+              height = parseInt(svgElement.getAttribute('height')),
+              points = [];
+          if (width !== height)
+            return console.warn(("width " + width + " !== height " + height));
+          for (var i$__11 = 0,
+              node = void 0; node = svgElement.childNodes[i$__11++]; ) {
+            if (!node.tagName)
+              continue;
+            if ('polygon' !== node.tagName.toLowerCase())
+              return console.warn((path + " unexpected node.tagName"));
+            points.push([]);
+            var pairs = node.getAttribute('points').replace(/\s+/g, ' ').replace(/\s+$/, '').split(' ');
+            for (var j = 0,
+                pair = void 0,
+                p = void 0; pair = pairs[j++]; ) {
+              p = pair.split(',');
+              points[points.length - 1].push(new $__8.THREE.Vector2(p[0] / width - 0.5, -p[1] / width + 1));
+            }
+          }
+          var shape = new $__8.THREE.Shape(points.shift());
+          for (var i = 0,
+              hole = void 0; hole = points[i++]; ) {
+            if (0 > polygonArea(hole)) {
+              hole.reverse();
+              console.log('Fixed a clockwise hole!');
+            }
+            hole.unshift(hole[0]);
+            shape.holes.push(new $__8.THREE.Path(hole));
+          }
+          var geometry = new $__8.THREE.ExtrudeGeometry(shape, {
+            amount: 0.02,
+            steps: 1,
+            material: 0,
+            extrudeMaterial: 1,
+            bevelEnabled: false,
+            bevelThickness: 0.1,
+            bevelSize: 0.2,
+            bevelSegments: 1
+          });
+          planarProjection(geometry, {
+            x: -0.5,
+            y: 0
+          }, {
+            x: 0.5,
+            y: 1
+          }, $__8.THREE);
+          $__8.geometries[path] = geometry;
+          callback(geometry);
+        }, function() {
+          console.log("Loading SVG...");
+          callback(false);
+        }, function(e) {
+          console.warn("Error loading SVG!", e);
+          callback(false);
+        });
+      }
     }
   }, {});
   Flatland.NAME = NAME;
@@ -234,7 +285,7 @@
   'use strict';
   ROOT.Flatland.El.Cutout = function($__super) {
     function $__0(config, app) {
-      var $__11;
+      var $__8;
       $traceurRuntime.superConstructor($__0).call(this, config, app);
       var defaults = {
         bitmap: ROOT.Flatland.HOMEPAGE + '/support/assets/test-1024.jpg',
@@ -250,27 +301,27 @@
         yScale: 1,
         zScale: 1,
         repeat: 1,
-        shadow: true,
+        shadow: false,
         visible: true,
         luminous: false
       };
       Object.assign(this, defaults, config, {app: app});
       this.material = app.getMaterial(this.bitmap, this.repeat, this.luminous);
-      app.getGeometry(this.svg, ($__11 = this, function(geometry) {
+      app.getGeometry(this.svg, ($__8 = this, function(geometry) {
         if (!geometry)
           return;
-        $__11.ref = new app.THREE.Mesh(geometry, new app.THREE.MultiMaterial([$__11.material, $__11.material]));
-        if (null != $__11.xyScale)
-          $__11.xScale = $__11.yScale = $__11.xyScale;
-        $__11.ref.position.set($__11.x, $__11.y, $__11.z);
-        $__11.ref.scale.set($__11.xScale, $__11.yScale, 1);
-        $__11.ref.visible = $__11.visible;
-        $__11.ref.rotation.set($__11.xRotate * Math.PI / 180, $__11.yRotate * Math.PI / 180, $__11.zRotate * Math.PI / 180);
-        if (!$__11.luminous) {
-          $__11.ref.receiveShadow = $__11.shadow;
-          $__11.ref.castShadow = $__11.shadow;
+        $__8.ref = new app.THREE.Mesh(geometry, new app.THREE.MultiMaterial([$__8.material, $__8.material]));
+        if (null != $__8.xyScale)
+          $__8.xScale = $__8.yScale = $__8.xyScale;
+        $__8.ref.position.set($__8.x, $__8.y, $__8.z);
+        $__8.ref.scale.set($__8.xScale, $__8.yScale, 1);
+        $__8.ref.visible = $__8.visible;
+        $__8.ref.rotation.set($__8.xRotate * Math.PI / 180, $__8.yRotate * Math.PI / 180, $__8.zRotate * Math.PI / 180);
+        if (!$__8.luminous) {
+          $__8.ref.receiveShadow = $__8.shadow;
+          $__8.ref.castShadow = $__8.shadow;
         }
-        app.scene.add($__11.ref);
+        app.scene.add($__8.ref);
       }));
     }
     return ($traceurRuntime.createClass)($__0, {}, {}, $__super);

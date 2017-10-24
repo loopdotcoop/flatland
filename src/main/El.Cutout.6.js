@@ -27,7 +27,7 @@ ROOT.Flatland.El.Cutout = class extends ROOT.Flatland.El {
           , yScale:   1
           , zScale:   1
           , repeat:   1
-          , shadow:   true
+          , shadow:   false//true
           , visible:  true // visible by default
           , luminous: false
         }
